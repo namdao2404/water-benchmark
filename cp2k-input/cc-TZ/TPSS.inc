@@ -1,0 +1,8 @@
+&XC
+  &XC_FUNCTIONAL
+    &MGGA_X_TPSS
+    &END
+    &MGGA_X_TPSS
+    &END
+  &END XC_FUNCTIONAL
+&END XC

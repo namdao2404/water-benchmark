@@ -1,0 +1,56 @@
+@SET EPS_CONV 1.0E-4
+@INCLUDE ../../../geometries/1_CUTOFF.inc
+&FORCE_EVAL
+  METHOD Quickstep
+  STRESS_TENSOR ANALYTICAL
+  &PRINT
+    &FORCES
+    &END
+    &STRESS_TENSOR
+    &END STRESS_TENSOR
+  &END PRINT
+  &DFT
+    BASIS_SET_FILE_NAME    ../../BASIS
+    POTENTIAL_FILE_NAME    ../../POTENTIAL
+    &MGRID
+     CUTOFF      800
+     REL_CUTOFF   50
+    &END MGRID
+    &QS
+      EPS_DEFAULT 1.0E-10
+    &END QS
+    &SCF
+      SCF_GUESS  RESTART
+      EPS_SCF    1.0E-6
+      MAX_SCF    10
+      &OT
+        MINIMIZER       DIIS
+        PRECONDITIONER  FULL_ALL
+      &END
+      &OUTER_SCF
+        EPS_SCF  1.0E-6
+        MAX_SCF  2
+      &END
+      &PRINT
+        &RESTART ON
+          BACKUP_COPIES 0
+        &END
+      &END
+    &END SCF
+@INCLUDE ../../revDSDPBEP86.inc
+  &END DFT
+  &SUBSYS
+@INCLUDE ../../../geometries/1.inc
+    &TOPOLOGY
+       COORD_FILE_NAME   ../../../geometries/1.xyz
+       COORD_FILE_FORMAT XYZ
+    &END TOPOLOGY
+@INCLUDE ../../DH_KIND.inc
+  &END SUBSYS
+&END FORCE_EVAL
+&GLOBAL
+  PROJECT     revDSDPBEP86
+  RUN_TYPE    ENERGY_FORCE
+  PREFERRED_DIAG_LIBRARY SL
+&END GLOBAL
+

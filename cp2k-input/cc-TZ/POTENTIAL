@@ -1,0 +1,43 @@
+#
+# Pseudopotentials for PBE
+# taken from POTENTIAL_UZH
+#
+H GTH-PBE-q1 GTH-GGA-q1
+    1    0    0    0
+    0.20059317301776       2   -4.17806832477260    0.72440924243368
+       0
+#
+O  GTH-PBE-q6 GTH-GGA-q6
+    2    4    0    0
+    0.24446328480160       2  -16.67548222363837    2.48908598241780
+       1
+    0.22097110943471       1   18.33446866406285
+#
+# Pseudopotentials for Hybrid calculations
+# taken from POTENTIAL_UZH
+#
+H GTH-PBE0-q1 GTH-HYB-q1
+    1    0    0    0
+    0.20049539759096       2   -4.17780338804233    0.72403926676805
+       0
+#
+O  GTH-PBE0-q6 GTH-HYB-q6
+    2    4    0    0
+    0.24671011902360       2  -16.65533253748591    2.50854752353111
+       1
+    0.22100154713718       1   18.34370453997725
+#
+# Pseudopotential for SCAN
+# taken from POTENTIAL_UZH
+#
+H GTH-SCAN-q1 GTH-MGGA-q1
+    1    0    0    0
+    0.20056928322660       2   -4.17724313510555    0.72381629178602
+       0
+#
+O  GTH-SCAN-q6 GTH-MGGA-q6
+    2    4    0    0
+    0.24033250028114       2  -16.79498564058792    2.45245698380706
+       1
+    0.22149979669698       1   18.44156246860022
+

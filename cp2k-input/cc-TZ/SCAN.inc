@@ -1,0 +1,8 @@
+&XC
+  &XC_FUNCTIONAL
+    &MGGA_X_SCAN
+    &END
+    &MGGA_C_SCAN
+    &END
+  &END XC_FUNCTIONAL
+&END XC

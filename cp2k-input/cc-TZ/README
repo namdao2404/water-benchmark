@@ -1,0 +1,4 @@
+This directory contains the relevant include files and a typical input file. In certain cases, the parameters were adjusted, see the actual input and output files for further information.
+The files *_KIND.inc contain the definitions of the basis sets and pseudopotentials given in BASIS and POTENTIALS.
+The files <FUNCTIONAL_NAME>.inc contain the definition of the different functionals in CP2K.
+The geometries with their respective defininition of the unit cells and cutoff radii for the truncated Coulomb potential are found in the tarball geometries.tar.gz (probably on the next upper level).
