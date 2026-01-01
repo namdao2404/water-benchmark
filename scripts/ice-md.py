@@ -75,7 +75,7 @@ dyn.run(equilibration_steps)
 ##run##
 md_logger = MDLogger(dyn, atoms, logfile=logfile, 
                      header=True, stress=False, mode='w')
-dyn.attach(md_logger, interval=100) #md log check
+dyn.attach(md_logger, interval=1) #md log check
 traj = Trajectory(trajectory_file, 'w', atoms)
 dyn.attach(traj.write, interval=1) ## will write .traj file
 print(f"Starting equilibration NVT (diffusion coefficient) for ice-phase water for {functional}...")
