@@ -16,7 +16,7 @@ from scipy import stats
 functional = "pbe"
 T = 300  # Temperature (K)
 timestep = 1.0   # MD simulation timestep in femtoseconds (fs)
-save_interval = 100 # Number of MD steps between saved frames in the trajectory file
+save_interval = 1 # Number of MD steps between saved frames in the trajectory file
 nsteps = 200000 # Total number of MD simulation steps
 
 # Path to your trajectory file
