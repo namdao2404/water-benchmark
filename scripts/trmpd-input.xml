@@ -1,0 +1,75 @@
+<simulation verbosity='medium'>
+  <!--
+    TRPMD production run for liquid water
+    
+    NVT, T = 300 K, 64 H2O, cubic L = 12.42 A
+    TRPMD, 32 beads, physical masses on every bead (TRPMD, not PA-CMD)
+    pile_lambda = 0.5 
+
+    Run per functional: pbe, scan, b3lyp, revpbe0_d3, revdsdpbep86.
+  -->
+
+  <output prefix='water_trpmd_pbe'>
+    <properties stride='10' filename='out'>
+      [ step, time{femtosecond}, conserved{electronvolt},
+        temperature{kelvin}, kinetic_cv{electronvolt},
+        potential{electronvolt} ]
+    </properties>
+
+    <trajectory filename='xb0' stride='1' format='xyz' cell_units='angstrom' bead='0'>
+      positions{angstrom}
+    </trajectory>
+
+    <trajectory filename='vb0' stride='1' format='xyz' cell_units='angstrom' bead='0'>
+      velocities{m/s}
+    </trajectory>
+
+    <trajectory filename='xc' stride='1' format='xyz' cell_units='angstrom'>
+      x_centroid{angstrom}
+    </trajectory>
+
+    <trajectory filename='vc' stride='1' format='xyz' cell_units='angstrom'>
+      v_centroid{m/s}
+    </trajectory>
+
+    <trajectory filename='pos' stride='1000' format='xyz' cell_units='angstrom'>
+      positions{angstrom}
+    </trajectory>
+
+    <checkpoint stride='20000' filename='checkpoint' overwrite='true'/>
+  </output>
+
+  <total_steps> 100000 </total_steps>
+
+  <prng><seed>31415</seed></prng>
+
+  <ffsocket name='cace' mode='unix' pbc='true'>
+    <address>ipi_cace_pbe_35642893</address>
+    <latency> 1e-4 </latency>
+  </ffsocket>
+
+  <system>
+    <initialize nbeads='32'>
+      <file mode='chk'> water_trpmd_pbe.checkpoint </file>
+    </initialize>
+
+    <forces>
+      <force forcefield='cace'/>
+    </forces>
+
+    <ensemble>
+      <temperature units='kelvin'> 300 </temperature>
+    </ensemble>
+
+    <motion mode='dynamics'>
+      <dynamics mode='nvt'>
+        <timestep units='femtosecond'> 0.5 </timestep>
+
+        <thermostat mode='pile_l'>
+          <tau units='femtosecond'> 100 </tau>
+          <pile_lambda> 0.5 </pile_lambda>
+        </thermostat>
+      </dynamics>
+    </motion>
+  </system>
+</simulation>
