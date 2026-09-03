@@ -13,7 +13,7 @@ model_path = f'./lightning_logs/100{functional}_lr/best_model.pth'
 DEVICE = 'cuda'
 temperature = 100 # for ice 
 timestep = 0.25 # fs; smaller time step for better polarization data 
-nsteps = 200000
+nsteps = 800000 # 200ps total
 trajectory_file = f'test_2_nam_model_nvt_ice_h2o_{functional}_5.5_0.25fs_200000.traj'
 logfile = f'test_2_nam_model_nvt_ice_h2o_{functional}_5.5_0.25fs_200000.log'
 
@@ -56,7 +56,7 @@ from ase.md.npt import NPT
 from ase.md.logger import MDLogger
 from ase import Atoms, units
 from ase.io.trajectory import Trajectory
-equilibration_steps = 5000 ## can choose
+equilibration_steps = 100000 ## can choose
 
 print(f"Starting geometry optimization for for ice-phase water for {functional}...")
 
