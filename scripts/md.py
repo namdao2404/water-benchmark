@@ -12,7 +12,7 @@ model_path = f'./lightning_logs/100{functional}_lr/best_model.pth'
 DEVICE = 'cuda'
 temperature = 300
 timestep = 1 #fs #0.25 fs to compute IR spectra
-nsteps = 200000
+nsteps = 1000000
 trajectory_file = f'h2o_{functional}_md_1fs_{nsteps}.traj'
 logfile = f'h2o_{functional}_md_1fs_{nsteps}.log'
 
@@ -55,7 +55,7 @@ from ase.md.npt import NPT
 from ase.md.logger import MDLogger
 from ase import Atoms, units
 from ase.io.trajectory import Trajectory
-equilibration_steps = 5000 ## can choose
+equilibration_steps = 50000 ## can choose
 dyn = NPT(atoms, 
                     timestep * units.fs, 
                     temperature_K= temperature,
