@@ -6,34 +6,49 @@ from scipy import stats
 import contextlib
 import os
 
-# --------------------------------------------------
-# Parameters (unchanged)
-# --------------------------------------------------
-T = 300
-timestep = 1.0        # fs
-save_interval = 1
-nsteps = 200000
+# parameters
+timestep = 1.0  # fs
+save_interval = 100  # trajectory saved every 100 md steps
 
-functional = 'pbe'
+if len(sys.argv) < 2:
+    raise ValueError("usage: python diffusion.py <functional>")
+
+functional = sys.argv[1]
 
 traj_file = (
-    f"/global/scratch/users/namdao2404/md_IR/traj_1fs_files/"
-    f"nam_model_h2o_{functional}_5.5_md_h2o_1fs_200000.traj"
+    f"/global/scratch/users/namdao2404/"
+    f"long_md/long_md_trajectories/1fs_1000ps/"
+    f"nam_model_h2o_{functional}_md_1fs_1000ps.traj"
 )
 
-EQUILIBRATION_STEPS = 20000 #extra equilibration steps
-SKIP_FRAMES = EQUILIBRATION_STEPS // save_interval
-ANALYSIS_STRIDE = 500 # sample every 0.5ps
+# analysis settings
+# 50 ps of equilibration already completed before the start of the trajectory
+FRAME_SPACING_PS = timestep * save_interval / 1000.0  # 0.1 ps
 
-outdir = "diffusion_long_equilibration"
+# analyze every 0.5 ps
+ANALYSIS_STRIDE = int(0.5 / FRAME_SPACING_PS)
+
+# fit window for diffusion (and slope diagnostic)
+T_MIN_FIT = 100.0  # ps
+T_MAX_FIT = None
+
+N_BLOCKS = 5
+
+# fraction of the per block msd length to keep as usable lag
+MAX_LAG_FRACTION = 0.8
+
+outdir = (
+    "/global/scratch/users/namdao2404/"
+    "diffusion/diffusion_1fs_1000ps"
+)
+
 os.makedirs(outdir, exist_ok=True)
 
 output_txt = f"{outdir}/diffusion_{functional}.txt"
 
-# --------------------------------------------------
-# FFT-based MSD (Borodin algorithm)
-# --------------------------------------------------
+
 def msd_fft(pos):
+    # fft based msd, borodin algorithm
     N, n_atoms, _ = pos.shape
 
     sq_pos = np.sum(pos**2, axis=2)
@@ -59,9 +74,11 @@ def msd_fft(pos):
     denom = np.arange(N, 0, -1)
     return (S1 - 2.0 * S2) / (denom * n_atoms)
 
-def compute_loglog_slope(time_ps, msd, t_min_ps=1.0):
 
+def compute_loglog_slope(time_ps, msd, t_min_ps=10.0, t_max_ps=None):
     mask = (time_ps >= t_min_ps) & (msd > 0)
+    if t_max_ps is not None:
+        mask &= (time_ps <= t_max_ps)
 
     t = time_ps[mask]
     y = msd[mask]
@@ -71,14 +88,9 @@ def compute_loglog_slope(time_ps, msd, t_min_ps=1.0):
 
     result = stats.linregress(np.log(t), np.log(y))
 
-    alpha = result.slope
-    alpha_err = result.stderr
+    return result.slope, result.stderr
 
-    return alpha, alpha_err
 
-# --------------------------------------------------
-# MSD calculation
-# --------------------------------------------------
 def calculate_msd_fft(
     traj_path,
     md_timestep,
@@ -86,7 +98,8 @@ def calculate_msd_fft(
     atom_symbol="O",
     start_frame=0,
     end_frame=None,
-    stride=1
+    stride=1,
+    max_lag_fraction=MAX_LAG_FRACTION,
 ):
     traj = Trajectory(traj_path, "r")
 
@@ -112,15 +125,14 @@ def calculate_msd_fft(
     dt_ps = md_timestep * save_interval * stride / 1000.0
     time_ps = np.arange(len(msd)) * dt_ps
 
-    max_lag = len(msd) // 2
+    max_lag = int(max_lag_fraction * len(msd))
     return time_ps[:max_lag], msd[:max_lag]
 
-# --------------------------------------------------
-# Diffusion coefficient + slope uncertainty
-# --------------------------------------------------
-def compute_diffusion_coefficient(time_ps, msd, t_min_ps=1.0):
 
+def compute_diffusion_coefficient(time_ps, msd, t_min_ps=1.0, t_max_ps=None):
     mask = time_ps >= t_min_ps
+    if t_max_ps is not None:
+        mask &= time_ps <= t_max_ps
     t = time_ps[mask]
     y = msd[mask]
 
@@ -138,30 +150,30 @@ def compute_diffusion_coefficient(time_ps, msd, t_min_ps=1.0):
 
     return D, D_stderr, slope, r2
 
-# --------------------------------------------------
-# Block averaging with propagated uncertainty
-# --------------------------------------------------
+
 def compute_diffusion_block_averaged(
     traj_path,
     md_timestep,
     save_interval,
     atom_symbol,
-    n_blocks=8,              # UPDATED TO 8
+    n_blocks=10,
     t_min_ps=1.0,
-    stride=1
+    t_max_ps=None,
+    stride=1,
+    max_lag_fraction=MAX_LAG_FRACTION,
 ):
+    # block averaging with propagated uncertainty
     traj = Trajectory(traj_path, "r")
     total_frames = len(traj)
 
-    usable_frames = total_frames - SKIP_FRAMES
-    block_size = usable_frames // n_blocks
+    block_size = total_frames // n_blocks
 
     D_blocks = []
     D_fit_errors = []
 
     for i in range(n_blocks):
-        start = SKIP_FRAMES + i * block_size
-        end = SKIP_FRAMES + (i + 1) * block_size if i < n_blocks - 1 else total_frames
+        start = i * block_size
+        end = (i + 1) * block_size if i < n_blocks - 1 else total_frames
 
         t, m = calculate_msd_fft(
             traj_path,
@@ -171,9 +183,10 @@ def compute_diffusion_block_averaged(
             start_frame=start,
             end_frame=end,
             stride=stride,
+            max_lag_fraction=max_lag_fraction,
         )
 
-        D_i, D_fit_i, _, _ = compute_diffusion_coefficient(t, m, t_min_ps)
+        D_i, D_fit_i, _, _ = compute_diffusion_coefficient(t, m, t_min_ps, t_max_ps)
 
         if not np.isnan(D_i):
             D_blocks.append(D_i)
@@ -186,37 +199,37 @@ def compute_diffusion_block_averaged(
 
     mean_D = np.mean(D_blocks)
 
-    # Block-to-block spread
+    # block to block spread
     block_std = np.std(D_blocks, ddof=1)
 
-    # Standard error of mean (descriptive statistics)
+    # standard error of the mean
     sem_blocks = block_std / np.sqrt(n)
-
-    # Mean regression uncertainty
-    # mean_fit_var = np.mean(D_fit_errors**2)
-    # ignore this; i was double counting before
-
-    # Propagated SEM (block variance + fit variance)
-    # total_sem = np.sqrt(sem_blocks**2 + mean_fit_var)
 
     total_sem = sem_blocks
 
     return mean_D, total_sem, block_std, sem_blocks, D_blocks
 
-# --------------------------------------------------
-# Main
-# --------------------------------------------------
+
 if __name__ == "__main__":
 
     with open(output_txt, "w") as f, contextlib.redirect_stdout(f):
+
+        print(f"functional: {functional}")
+        print(f"trajectory: {traj_file}")
+        print(f"trajectory save interval: {FRAME_SPACING_PS:.3f} ps")
+        print(f"analysis stride: {ANALYSIS_STRIDE}")
+        print(f"block averaging: {N_BLOCKS} blocks")
+        print(f"fit window: {T_MIN_FIT} to {T_MAX_FIT} ps")
+        print(f"max lag fraction (per block): {MAX_LAG_FRACTION}")
+        print()
 
         t, msd = calculate_msd_fft(
             traj_file,
             timestep,
             save_interval,
             atom_symbol="O",
-            start_frame=SKIP_FRAMES,
             stride=ANALYSIS_STRIDE,
+            max_lag_fraction=MAX_LAG_FRACTION,
         )
 
         D, total_sem, block_std, sem_blocks, D_blocks = compute_diffusion_block_averaged(
@@ -224,70 +237,77 @@ if __name__ == "__main__":
             timestep,
             save_interval,
             atom_symbol="O",
-            n_blocks=8,
-            t_min_ps=10.0,
+            n_blocks=N_BLOCKS,
+            t_min_ps=T_MIN_FIT,
+            t_max_ps=T_MAX_FIT,
             stride=ANALYSIS_STRIDE,
+            max_lag_fraction=MAX_LAG_FRACTION,
         )
 
-        # ---- MSD plot ----
+        # msd plot
         plt.figure(figsize=(8, 6))
         plt.plot(t, msd, label="MSD (FFT)")
-        plt.axvline(10.0, ls="--", c="k")
-        
+        plt.axvline(T_MIN_FIT, ls="--", c="k")
+
+        if T_MAX_FIT is not None:
+            plt.axvline(T_MAX_FIT, ls="--", c="k")
+
         plt.xlabel("Time [ps]", fontsize=24)
         plt.ylabel("MSD [Å$^2$]", fontsize=24)
-        
+
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
-        
+
         plt.legend(fontsize=14)
         plt.tight_layout()
         plt.savefig(f"{outdir}/msd_{functional}.png", dpi=300)
         plt.close()
-        
-        
-        # ---- Log-log plot ----
+
+        # log log plot
         plt.figure(figsize=(7, 6))
-        fit = (t >= 10.0) & (msd > 0)
-        
-        plt.figure(figsize=(7, 6))
-        plt.loglog(t[fit], msd[fit], label="MSD")
-        
-        # --- Log–log slope ---
-        alpha, alpha_err = compute_loglog_slope(t, msd, t_min_ps=10.0)
-        
+        fit = (t >= T_MIN_FIT) & (msd > 0)
+        if T_MAX_FIT is not None:
+            fit &= (t <= T_MAX_FIT)
+
+        plt.loglog(t[(t > 0) & (msd > 0)], msd[(t > 0) & (msd > 0)], label="MSD")
+
+        alpha, alpha_err = compute_loglog_slope(
+            t, msd, t_min_ps=T_MIN_FIT, t_max_ps=T_MAX_FIT
+        )
+
         if not np.isnan(alpha):
-        
-            # Power-law fit: MSD = A * t^alpha
             coeffs = np.polyfit(np.log(t[fit]), np.log(msd[fit]), 1)
             A = np.exp(coeffs[1])
-        
+
             t_fit = t[fit]
             msd_fit = A * t_fit**alpha
-        
-            plt.loglog(t_fit, msd_fit, '--', 
+
+            plt.loglog(t_fit, msd_fit, '--',
                        label=f"Fit (α = {alpha:.2f} ± {alpha_err:.2f})")
-        
-        plt.axvline(1.0, ls="--", c="k")
-        
+
+        plt.axvline(T_MIN_FIT, ls="--", c="k")
+
+        if T_MAX_FIT is not None:
+            plt.axvline(T_MAX_FIT, ls="--", c="k")
+
         plt.xlabel("Time [ps]", fontsize=24)
         plt.ylabel("MSD [Å$^2$]", fontsize=24)
-        
+
         plt.legend(fontsize=14)
         plt.tight_layout()
         plt.savefig(f"{outdir}/msd_loglog_{functional}.png", dpi=300)
         plt.close()
 
-        print("=" * 60)
-        print("Diffusion coefficient (8-block averaged)")
+        print(f"diffusion coefficient ({N_BLOCKS} block averaged)")
         print(f"D = {D:.6f} ± {total_sem:.6f} Å²/ps")
         print(f"D = {D*1e-16:.2e} ± {total_sem*1e-16:.2e} cm²/s")
         print(f"D = {D*1e-20:.2e} ± {total_sem*1e-20:.2e} m²/s")
         print()
-        print(f"Block standard deviation (spread): {block_std:.6f}")
+        print(f"log log slope α = {alpha:.3f} ± {alpha_err:.3f} (should be ~1.0)")
+        print()
+        print(f"block standard deviation (spread): {block_std:.6f}")
         print(f"SEM from blocks only: {sem_blocks:.6f}")
-        print(f"Blocks used: {len(D_blocks)}")
-        print("Block values:", D_blocks)
-        print("=" * 60)
+        print(f"blocks used: {len(D_blocks)}")
+        print("block values:", D_blocks)
 
-        print(f"MSD and diffusion analysis for {functional} complete.")
+        print(f"msd and diffusion analysis for {functional} complete.")
